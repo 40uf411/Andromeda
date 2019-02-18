@@ -2,6 +2,7 @@
   "root":{
     "pass": "$2y$10$egbGRGYUGsYSLFDDCgFfdui4DuXtrQNXqcPRkonk5A5jizhTEh9yK",
     "isAdmin": true,
+    "locked": false,
     "privileges":{},
     "attributes":[]
   }

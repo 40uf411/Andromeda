@@ -1,32 +1,33 @@
 <?php
-/**
- * User: alex
- * Date: 11/25/18
- * Time: 9:13 PM
- */
+
+/* TODO
+*
+*
+*/
 
 namespace Luna\Andromeda\Sources;
 
+use Luna\Andromeda\Authentication\Auth;
 
 class Database
 {
     private $name;
-    private $tables = [];
-    private $imported = [];
+    private $owns = [];
+    private $imports = [];
 
+    private $meta_file = "";
+    
     private $sync = false;
 
     private function load_data()
     {
         if (! $this->sync )
         {
-            $file = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . ".."  . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . "_INNER_" . DIRECTORY_SEPARATOR . ".adt");
+            $meta = file_get_contents($this->meta_file);
+            $meta = json_decode($meta,true)[$this->name];
 
-            $file = json_decode($file, true);
-
-            $this->tables = $file['tables'];
-
-            $this->imported = $file['imported'];
+            $this->tables = $meta['owns'];
+            $this->imports = $meta['imports'];
 
             $this->sync = true;
         }
@@ -34,51 +35,151 @@ class Database
 
     private function save_data()
     {
-
-        $f = [
-          "tables" => $this->tables,
-          "imported" => $this->imported
-        ];
-
-        $f = json_encode($f);
-
-        file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . ".."  . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . "_INNER_" . DIRECTORY_SEPARATOR . ".adt",$f);
-
-        $this->sync = true;
+        if (! $this->sync )
+        {
+            $meta = file_get_contents($this->meta_file);
+            $meta = json_decode($meta,true);
+    
+            $meta[$this->name]["owns"] = $this->owns;
+            $meta[$this->name]["imports"] = $this->imports;
+    
+            file_put_contents($this->meta_file, \json_encode($meta));
+    
+            $this->sync = true;
+        }
     }
 
-    public function host($name, array $details = [])
+    public function host($table, array $details = [], $override = false)
     {
+        if(!Auth::admin() && ! Auth::user()->can("create", $this->name))
+
+            throw new \Error("Error! you don't have the authority to edit another user.");
+
+        if(Table::exist($table, $this->name) && !$override)
+
+            throw new \Error("Error! could not create database $name [database already exists].");
+
         $this->load_data();
 
         $folder = $this->name;
 
-        if ( ! Table::exist($name, $folder) and ! array_key_exists($name, $this->tables))
+        if(\is_a($table,Table::class))
         {
-            $this->tables[] = $name;
+            if($table->folder != $this->name)
 
-            $this->sync = false;
+                throw new \Error("Error! unmatched table and database.");
 
-            Table::create($name,$folder);
-
-            $this->save_data();
+            $this->owns[] = $table->name;
         }
         else
-            throw new \Error("Error! table already exist in database");
+        {
+            Table::create($table, $this->name, $details, $override);
+
+            $this->owns[] = $table;
+        }
+        $this->sync = false;
+
+        $this->save_data();
+    }
+    
+    public static function exist($name)
+    {
+        $meta_file =(string) __DIR__ . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . "System" . DIRECTORY_SEPARATOR  . "Databases.adt";
+
+        $meta_file = \file_get_contents($meta_file);
+
+        $meta_file= \json_decode($meta_file, true);
+        
+        return array_key_exists("$name",$meta_file);
     }
 
     public static function connect($name) :? self
     {
+        if(!Auth::admin() && ! Auth::user()->can("select", $name))
 
+            throw new \Error("Error! you don't have the authority to edit another user.");
+
+        if(self::exist($name))
+
+            throw new \Error("Error! could not create database $name [database already exists]");
+
+        $db = new self();
+        $db->name = $name;
+        $db->meta_file = __DIR__ . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . "System" . DIRECTORY_SEPARATOR  . "Databases.adt";
+        $db->load_data();
+        return $db;
     }
 
     public static function create($name) :? self
     {
+        if(!Auth::admin() && ! Auth::user()->can("insert", "System", "Databases"))
 
+            throw new \Error("Error! you don't have the authority to edit another user.");
+
+        if(self::exist($name))
+
+            throw new \Error("Error! could not create database $name [database already exists]");
+
+        mkdir(__DIR__ . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . $name);
+
+        return self::connect($name);
     }
 
-    public static function exist($name)
+    public function drop($name, $imported = false) :? self
     {
+        if(!Auth::admin() && ! Auth::user()->can("drop", $this->name))
 
+            throw new \Error("Error! you don't have the authority to edit another user.");
+
+        if($imported)
+        {
+            if( ! in_array($name, $this->imports))
+        
+                throw new \Error("Error! table $table is not imported.");
+            
+            $tmp = [];
+            foreach ($this->imports as $table) 
+            {
+                if($table == $name)
+                    continue;
+                $tmp[] = $table;    
+            }
+            $this->imports = $tmp;
+            $this->sync = false;
+            $this->save_data();
+            return true;
+        }
+        else
+        {
+            if( ! in_array($name, $this->imports))
+        
+                throw new \Error("Error! table $table is not in database " . $this->name . ".");
+
+            $tmp = [];
+            foreach ($this->owns as $table) 
+            {
+                if($table == $name)
+                    continue;
+                $tmp[] = $table;    
+            }
+            $this->owns = $tmp;
+            unlink(__DIR__ . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . $name . DIRECTORY_SEPARATOR . $name . ".adt");
+            $this->sync = false;
+            $this->save_data();
+            return true;
+        }
+    }
+
+    public function Unset()
+    {
+        if(!Auth::admin() && ! Auth::user()->can("unset", $this->name))
+
+            throw new \Error("Error! you don't have the authority to edit another user.");
+
+        foreach ($this->owns as $table) 
+        {
+            $this->drop($table);   
+        }
+        unlink(__DIR__ . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "Data" . DIRECTORY_SEPARATOR . $name);
     }
 }

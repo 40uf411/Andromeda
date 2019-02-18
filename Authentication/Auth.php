@@ -1,9 +1,4 @@
 <?php
-/**
- * Author: alex
- * Date: 11/24/18
- * Time: 5:17 PM
- */
 
 namespace Luna\Andromeda\Authentication;
 
@@ -15,8 +10,21 @@ class Auth
         return User::login($user,$pass);
     }
 
-    public static function create_user($user, $pass, ...$tables) :? User
+    public static function guest() :? User
     {
-        
+        return User::guest();
+    }
+
+    public static function admin() :? bool
+    {
+        return (is_a($GLOBALS["system_user"],User::class) && $GLOBALS["system_user"]->isAdmin());
+    }
+    public static function can($do, $database, $table = "@all")
+    {
+        return (is_a($GLOBALS["system_user"],User::class) && $GLOBALS["system_user"]->can($do, $database, $table));
+    }
+    public static function user()
+    {
+        return $GLOBALS["system_user"];
     }
 }

@@ -1,0 +1,18 @@
+{
+    "System": {
+        "location" : "/System",
+        "owns" : [
+            "Users", "Databases", "Tables"
+        ],
+        "imports" : [
+            "Pages@Test"
+        ]
+    },
+    "Test" : {
+        "location" : "/Test",
+        "owns" : [
+            "Test"
+        ],
+        "imports" : []
+    }
+}

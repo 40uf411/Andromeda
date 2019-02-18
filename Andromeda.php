@@ -1,11 +1,5 @@
 <?php
 
-/**
- * Author: alex
- * Date: 11/24/18
- * Time: 5:15 PM
- */
-
 namespace Luna\Andromeda;
 
 use Luna\Andromeda\Authentication\Auth;
@@ -13,26 +7,25 @@ use Luna\Andromeda\Authentication\Auth;
 class Andromeda
 {
     private static $init = false;
-    private  static $sources = ["Driver", "Database", "Table", "Query"];
-    private static $drivers = ["Json", "Mysql", "Oracle"];
-
+    private  static $sources = ["Json", "Database", "Table", "Query"];
 
     public static function init()
     {
         require_once "Authentication" . DIRECTORY_SEPARATOR . "Auth.php";
 
         foreach (self::$sources as $source)
-            require_once __DIR__ . "src" . DIRECTORY_SEPARATOR . $source .".php";
+            require_once __DIR__ . DIRECTORY_SEPARATOR . "src" . DIRECTORY_SEPARATOR . $source .".php";
 
-        foreach (self::$drivers as $driver)
-            require_once __DIR__ . "Drivers" . DIRECTORY_SEPARATOR . $driver .".php";
+        $GLOBALS["system_user"] = self::guest();
     }
 
-    public static function connect($user, $pass, $db = null, $driver = "Json")
+    public static function connect($user, $pass)
     {
-        if ($driver == "Json")
-        {
-            return Auth::login($user,$pass);
-        }
+        return Auth::login($user,$pass);
+    }
+
+    public static function guest()
+    {
+        return Auth::guest();
     }
 }

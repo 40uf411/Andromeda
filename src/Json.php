@@ -2,13 +2,12 @@
 /**
  * User: alex
  * Date: 11/24/18
- * Time: 7:05 PM
+ * Time: 7:44 PM
  */
 
-namespace Luna\Andromeda\Sources;
+namespace Luna\Andromeda\Driver;
 
-
-class Driver
+class Json
 {
     protected $connection = false;
 
@@ -36,5 +35,4 @@ class Driver
     {
         $this->config = $config;
     }
-
 }
